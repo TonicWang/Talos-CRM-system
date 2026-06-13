@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#14213d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="塔羅斯 CRM">
+  <title>塔羅斯 CRM - 手機詢價追蹤</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%2314213d' width='192' height='192'/%3E%3Ccircle cx='96' cy='96' r='58' fill='%23fca311'/%3E%3Ctext x='96' y='119' font-size='74' font-weight='700' fill='%2314213d' text-anchor='middle'%3ET%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #14213d;
+      --panel-2: #1f2a44;
+      --line: rgba(255,255,255,0.12);
+      --text: #f8fafc;
+      --muted: #a8b3c7;
+      --gold: #fca311;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #38bdf8;
+      --gray: #64748b;
+      --shadow: 0 18px 48px rgba(0,0,0,0.28);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; }
+    body { padding: max(14px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom)); }
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    .app { max-width: 640px; margin: 0 auto; padding-bottom: 18px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    h1 { margin: 0; font-size: 26px; line-height: 1.1; letter-spacing: 0; }
+    .subtitle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .icon-btn { width: 42px; height: 42px; border-radius: 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); display: grid; place-items: center; font-size: 18px; }
+    .primary { width: 100%; min-height: 52px; border-radius: 8px; background: var(--gold); color: #111827; font-weight: 800; box-shadow: 0 10px 22px rgba(252,163,17,0.22); }
+    .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 12px; }
+    .secondary { min-height: 42px; border-radius: 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); font-weight: 650; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+    .metric { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 12px; min-height: 78px; }
+    .metric small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .metric strong { font-size: 21px; line-height: 1.15; overflow-wrap: anywhere; }
+    .metric.due { border-color: rgba(239,68,68,0.45); }
+    .metric.done { border-color: rgba(34,197,94,0.45); }
+    .search-row { display: grid; grid-template-columns: 1fr 118px; gap: 8px; margin: 12px 0; }
+    .field, .select, textarea { width: 100%; color: var(--text); background: #111c31; border: 1px solid var(--line); border-radius: 8px; padding: 12px; outline: none; min-height: 44px; }
+    textarea { min-height: 82px; resize: vertical; }
+    .field::placeholder, textarea::placeholder { color: #7f8da5; }
+    .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0; }
+    .tab { min-height: 42px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; font-weight: 700; }
+    .tab.active { background: var(--gold); color: #111827; border-color: transparent; }
+    .list { display: grid; gap: 8px; }
+    .card { width: 100%; text-align: left; color: var(--text); background: #121d33; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+    .card-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .name { font-size: 16px; font-weight: 800; overflow-wrap: anywhere; }
+    .product { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+    .badge { display: inline-flex; align-items: center; min-height: 26px; padding: 4px 8px; border-radius: 7px; color: white; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .mini { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px; min-width: 0; }
+    .mini span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 3px; }
+    .mini b { font-size: 14px; overflow-wrap: anywhere; }
+    .card-foot { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 10px; }
+    .empty { text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 28px 12px; }
+    .modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: flex-end; justify-content: center; background: rgba(2,6,23,0.72); }
+    .modal.show { display: flex; }
+    .sheet { width: 100%; max-width: 640px; max-height: 92vh; overflow: auto; background: var(--panel); border-radius: 14px 14px 0 0; box-shadow: var(--shadow); padding: 16px 16px max(18px, env(safe-area-inset-bottom)); }
+    .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .sheet h2 { margin: 0; font-size: 19px; overflow-wrap: anywhere; }
+    .form { display: grid; gap: 10px; }
+    .form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .actions.three { grid-template-columns: 1fr 1fr 1fr; }
+    .danger { background: var(--red); color: white; }
+    .success { background: var(--green); color: #06240f; font-weight: 800; }
+    .blue { background: var(--blue); color: #082133; font-weight: 800; }
+    .plain { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    .detail-row { border-bottom: 1px solid var(--line); padding: 10px 0; }
+    .detail-row span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .detail-row b, .detail-row a, .detail-row div { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+    .history { display: grid; gap: 8px; margin-top: 8px; }
+    .history-item { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; font-size: 13px; }
+    .history-item small { display: block; color: var(--muted); margin-top: 2px; }
+    .lock { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none; place-items: center; padding: 20px; }
+    .lock.show { display: grid; }
+    .lock-box { width: min(100%, 420px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; box-shadow: var(--shadow); }
+    .toast { position: fixed; left: 14px; right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 60; display: none; background: #e5e7eb; color: #111827; border-radius: 8px; padding: 12px; font-weight: 750; text-align: center; }
+    .toast.show { display: block; }
+    .file-input { display: none; }
+    @media (max-width: 420px) {
+      body { padding-left: 10px; padding-right: 10px; }
+      .tabs { grid-template-columns: repeat(3, 1fr); }
+      .search-row, .actions.three { grid-template-columns: 1fr; }
+      .metric strong { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>塔羅斯 CRM</h1>
+        <p class="subtitle">手機詢價、追蹤、備份工具</p>
+      </div>
+      <button class="icon-btn" title="設定" onclick="openSettings()">⚙</button>
+    </header>
+
+    <button class="primary" onclick="openForm()">新增詢價</button>
+
+    <section class="metrics">
+      <div class="metric done"><small>已簽約總額</small><strong id="signedTotal">NT$0</strong></div>
+      <div class="metric"><small>潛在營收</small><strong id="potentialTotal">NT$0</strong></div>
+      <div class="metric due"><small>今天需追蹤</small><strong id="dueCount">0</strong></div>
+      <div class="metric"><small>進行中案件</small><strong id="activeCount">0</strong></div>
+    </section>
+
+    <div class="toolbar">
+      <button class="secondary" onclick="exportBackup()">備份 JSON</button>
+      <button class="secondary" onclick="exportCsv()">匯出 CSV</button>
+    </div>
+    <input class="file-input" type="file" id="importFile" accept=".json,application/json" onchange="importBackup(event)">
+
+    <div class="search-row">
+      <input class="field" id="searchInput" placeholder="搜尋客戶、電話、LINE、產品、備註" oninput="render()">
+      <select class="select" id="sortSelect" onchange="render()">
+        <option value="due">追蹤優先</option>
+        <option value="new">最新建立</option>
+        <option value="value">金額高到低</option>
+      </select>
+    </div>
+
+    <nav class="tabs">
+      <button class="tab active" id="tab-all" onclick="setTab('all')">全部 <span id="c-all">0</span></button>
+      <button class="tab" id="tab-due" onclick="setTab('due')">追蹤 <span id="c-due">0</span></button>
+      <button class="tab" id="tab-active" onclick="setTab('active')">進行 <span id="c-active">0</span></button>
+      <button class="tab" id="tab-signed" onclick="setTab('signed')">簽約 <span id="c-signed">0</span></button>
+      <button class="tab" id="tab-deleted" onclick="setTab('deleted')">回收 <span id="c-deleted">0</span></button>
+    </nav>
+
+    <section class="list" id="list"></section>
+  </main>
+
+  <div class="modal" id="formModal" onclick="closeModal(event, 'formModal')">
+    <section class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-head">
+        <h2 id="formTitle">新增詢價</h2>
+        <button class="icon-btn" onclick="closeForm()">×</button>
+      </div>
+      <div class="form">
+        <label>客戶名稱 *<input class="field" id="f_name"></label>
+        <label>電話<input class="field" id="f_phone" type="tel"></label>
+        <label>LINE ID<input class="field" id="f_line"></label>
+        <label>產品類型 *<input class="field" id="f_product"></label>
+        <label>數量<input class="field" id="f_qty" type="number" min="1" value="1"></label>
+        <label>報價金額<input class="field" id="f_price" type="number" min="0"></label>
+        <label>狀態
+          <select class="select" id="f_status">
+            <option value="pending_quote">待報價</option>
+            <option value="quoted">已報價</option>
+            <option value="negotiating">議價中</option>
+            <option value="signed">已簽約</option>
+            <option value="dead">已取消</option>
+          </select>
+        </label>
+        <label>下次追蹤日<input class="field" id="f_follow" type="date"></label>
+        <label>負責人<input class="field" id="f_owner" placeholder="例如：業務 A"></label>
+        <label>備註<textarea id="f_notes"></textarea></label>
+        <div class="actions">
+          <button class="secondary" onclick="closeForm()">取消</button>
+          <button class="success" onclick="saveForm()">保存</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal" id="detailModal" onclick="closeModal(event, 'detailModal')">
+    <section class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-head">
+        <h2 id="detailTitle"></h2>
+        <button class="icon-btn" onclick="closeDetail()">×</button>
+      </div>
+      <div id="detailBody"></div>
+    </section>
+  </div>
+
+  <div class="modal" id="settingsModal" onclick="closeModal(event, 'settingsModal')">
+    <section class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-head">
+        <h2>設定與資料安全</h2>
+        <button class="icon-btn" onclick="closeSettings()">×</button>
+      </div>
+      <div class="form">
+        <button class="secondary" onclick="document.getElementById('importFile').click()">還原 JSON 備份</button>
+        <button class="danger" onclick="clearAllData()">清除全部本機資料</button>
+        <p class="subtitle">提醒：這是單機版 App。備份檔請定期存到雲端硬碟；多人同步與正式帳號權限需要接雲端資料庫。</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORE_KEY = "talos_crm_v2";
+    const STATUS_TEXT = {
+      pending_quote: "待報價",
+      quoted: "已報價",
+      negotiating: "議價中",
+      signed: "已簽約",
+      dead: "已取消"
+    };
+    const STATUS_COLOR = {
+      pending_quote: "#38bdf8",
+      quoted: "#64748b",
+      negotiating: "#f59e0b",
+      signed: "#22c55e",
+      dead: "#ef4444"
+    };
+    const emptyRecord = {
+      customerName: "", phone: "", lineId: "", productType: "", quantity: 1,
+      quotePrice: 0, status: "pending_quote", followUpDate: "", owner: "", notes: ""
+    };
+    let records = [];
+    let currentTab = "all";
+    let editingId = null;
+    let detailId = null;
+
+    function todayISO() {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 10);
+    }
+    function daysBetween(dateText) {
+      if (!dateText) return null;
+      const today = new Date(todayISO() + "T00:00:00");
+      const d = new Date(dateText + "T00:00:00");
+      return Math.round((d - today) / 86400000);
+    }
+    function money(n) {
+      return "NT$" + (Number(n) || 0).toLocaleString("zh-TW");
+    }
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+    function toast(text) {
+      const el = document.getElementById("toast");
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+    }
+    function loadData() {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        try { records = JSON.parse(raw).records || []; }
+        catch { records = []; }
+      }
+      if (!records.length) {
+        const t = todayISO();
+        records = [
+          makeRecord({ customerName: "張三酒吧", phone: "0912-345-678", lineId: "@zhang_san_bar", productType: "Unitank 2.0", quotePrice: 150000, status: "quoted", followUpDate: t, notes: "客戶希望能便宜一點" }),
+          makeRecord({ customerName: "李四便利店", phone: "0912-456-789", lineId: "@li_si_shop", productType: "Grainfather G30", quantity: 2, quotePrice: 320000, status: "pending_quote", followUpDate: t, notes: "大訂單，有議價空間" }),
+          makeRecord({ customerName: "王五啤酒館", phone: "0912-567-890", lineId: "@wang_wu_beer", productType: "iGulu", quotePrice: 85000, status: "signed", notes: "已簽約，2026/06/20 交貨" })
+        ];
+        saveData();
+      }
+    }
+    function saveData() {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ version: 2, savedAt: new Date().toISOString(), records }));
+    }
+    function makeRecord(data) {
+      const now = new Date().toISOString();
+      return {
+        ...emptyRecord,
+        ...data,
+        inquiryId: data.inquiryId || "INQ_" + Date.now() + "_" + Math.random().toString(16).slice(2, 7),
+        createdAt: data.createdAt || now,
+        updatedAt: data.updatedAt || now,
+        lastContactDate: data.lastContactDate || now.slice(0, 10),
+        deletedAt: data.deletedAt || "",
+        history: data.history || [{ at: now, type: "建立", text: "新增詢價" }]
+      };
+    }
+    function addHistory(record, type, text) {
+      record.history = record.history || [];
+      record.history.unshift({ at: new Date().toISOString(), type, text });
+      record.updatedAt = new Date().toISOString();
+    }
+    function isActive(r) {
+      return !r.deletedAt && ["pending_quote", "quoted", "negotiating"].includes(r.status);
+    }
+    function isDue(r) {
+      return isActive(r) && r.followUpDate && daysBetween(r.followUpDate) <= 0;
+    }
+    function dueLabel(r) {
+      if (!r.followUpDate) return "未設定追蹤日";
+      const d = daysBetween(r.followUpDate);
+      if (d < 0) return "逾期 " + Math.abs(d) + " 天";
+      if (d === 0) return "今天追蹤";
+      return d + " 天後追蹤";
+    }
+    function setTab(tab) {
+      currentTab = tab;
+      ["all", "due", "active", "signed", "deleted"].forEach(t => {
+        document.getElementById("tab-" + t).classList.toggle("active", t === tab);
+      });
+      render();
+    }
+    function filteredRecords() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      let list = records.filter(r => {
+        if (currentTab === "deleted") return !!r.deletedAt;
+        return !r.deletedAt;
+      });
+      if (currentTab === "due") list = list.filter(isDue);
+      if (currentTab === "active") list = list.filter(isActive);
+      if (currentTab === "signed") list = list.filter(r => r.status === "signed");
+      if (q) {
+        list = list.filter(r => [r.customerName, r.phone, r.lineId, r.productType, r.owner, r.notes, STATUS_TEXT[r.status]]
+          .join(" ").toLowerCase().includes(q));
+      }
+      const sort = document.getElementById("sortSelect").value;
+      list.sort((a, b) => {
+        if (sort === "value") return (Number(b.quotePrice) || 0) - (Number(a.quotePrice) || 0);
+        if (sort === "new") return new Date(b.createdAt) - new Date(a.createdAt);
+        const ad = isDue(a) ? -1000 + (daysBetween(a.followUpDate) || 0) : (daysBetween(a.followUpDate) ?? 999);
+        const bd = isDue(b) ? -1000 + (daysBetween(b.followUpDate) || 0) : (daysBetween(b.followUpDate) ?? 999);
+        return ad - bd || new Date(b.updatedAt) - new Date(a.updatedAt);
+      });
+      return list;
+    }
+    function render() {
+      const active = records.filter(isActive);
+      const signed = records.filter(r => !r.deletedAt && r.status === "signed");
+      const deleted = records.filter(r => r.deletedAt);
+      const due = records.filter(isDue);
+      document.getElementById("signedTotal").textContent = money(signed.reduce((s, r) => s + (Number(r.quotePrice) || 0), 0));
+      document.getElementById("potentialTotal").textContent = money(active.reduce((s, r) => s + (Number(r.quotePrice) || 0), 0));
+      document.getElementById("dueCount").textContent = due.length;
+      document.getElementById("activeCount").textContent = active.length;
+      document.getElementById("c-all").textContent = records.filter(r => !r.deletedAt).length;
+      document.getElementById("c-due").textContent = due.length;
+      document.getElementById("c-active").textContent = active.length;
+      document.getElementById("c-signed").textContent = signed.length;
+      document.getElementById("c-deleted").textContent = deleted.length;
+
+      const list = filteredRecords();
+      const box = document.getElementById("list");
+      if (!list.length) {
+        box.innerHTML = '<div class="empty">沒有符合條件的資料</div>';
+        return;
+      }
+      box.innerHTML = list.map(r => `
+        <button class="card" onclick="openDetail('${esc(r.inquiryId)}')">
+          <div class="card-head">
+            <div>
+              <div class="name">${esc(r.customerName)}</div>
+              <div class="product">${esc(r.productType)} × ${esc(r.quantity)}</div>
+            </div>
+            <span class="badge" style="background:${STATUS_COLOR[r.status] || "#64748b"}">${STATUS_TEXT[r.status] || "未知"}</span>
+          </div>
+          <div class="grid2">
+            <div class="mini"><span>報價</span><b>${money(r.quotePrice)}</b></div>
+            <div class="mini"><span>追蹤</span><b>${esc(dueLabel(r))}</b></div>
+          </div>
+          <div class="card-foot">
+            <span>${esc(r.owner || "未指派")}</span>
+            <span>${r.deletedAt ? "已放入回收" : "最後聯絡 " + esc(r.lastContactDate || "未記錄")}</span>
+          </div>
+        </button>
+      `).join("");
+    }
+    function openForm(id) {
+      editingId = id || null;
+      const r = editingId ? records.find(x => x.inquiryId === editingId) : emptyRecord;
+      document.getElementById("formTitle").textContent = editingId ? "編輯詢價" : "新增詢價";
+      document.getElementById("f_name").value = r.customerName || "";
+      document.getElementById("f_phone").value = r.phone || "";
+      document.getElementById("f_line").value = r.lineId || "";
+      document.getElementById("f_product").value = r.productType || "";
+      document.getElementById("f_qty").value = r.quantity || 1;
+      document.getElementById("f_price").value = r.quotePrice || "";
+      document.getElementById("f_status").value = r.status || "pending_quote";
+      document.getElementById("f_follow").value = r.followUpDate || "";
+      document.getElementById("f_owner").value = r.owner || "";
+      document.getElementById("f_notes").value = r.notes || "";
+      document.getElementById("formModal").classList.add("show");
+    }
+    function closeForm() {
+      document.getElementById("formModal").classList.remove("show");
+      editingId = null;
+    }
+    function saveForm() {
+      const data = {
+        customerName: document.getElementById("f_name").value.trim(),
+        phone: document.getElementById("f_phone").value.trim(),
+        lineId: document.getElementById("f_line").value.trim(),
+        productType: document.getElementById("f_product").value.trim(),
+        quantity: Math.max(1, Number(document.getElementById("f_qty").value) || 1),
+        quotePrice: Math.max(0, Number(document.getElementById("f_price").value) || 0),
+        status: document.getElementById("f_status").value,
+        followUpDate: document.getElementById("f_follow").value,
+        owner: document.getElementById("f_owner").value.trim(),
+        notes: document.getElementById("f_notes").value.trim()
+      };
+      if (!data.customerName || !data.productType) {
+        toast("請填入客戶名稱與產品類型");
+        return;
+      }
+      if (editingId) {
+        const r = records.find(x => x.inquiryId === editingId);
+        Object.assign(r, data);
+        addHistory(r, "編輯", "更新客戶資料");
+      } else {
+        records.unshift(makeRecord(data));
+      }
+      saveData();
+      closeForm();
+      render();
+      toast("已保存");
+    }
+    function openDetail(id) {
+      const r = records.find(x => x.inquiryId === id);
+      if (!r) return;
+      detailId = id;
+      document.getElementById("detailTitle").textContent = r.customerName;
+      const deletedActions = `
+        <div class="actions">
+          <button class="success" onclick="restoreRecord()">恢復</button>
+          <button class="danger" onclick="permanentDelete()">永久刪除</button>
+        </div>`;
+      const normalActions = `
+        <div class="actions three">
+          <button class="blue" onclick="markContacted()">已聯絡</button>
+          <button class="success" onclick="markSigned()">簽約</button>
+          <button class="plain" onclick="openForm('${esc(r.inquiryId)}')">編輯</button>
+        </div>
+        <div class="actions">
+          <button class="secondary" onclick="setTomorrow()">明天追蹤</button>
+          <button class="danger" onclick="softDelete()">移到回收</button>
+        </div>`;
+      document.getElementById("detailBody").innerHTML = `
+        ${r.deletedAt ? deletedActions : normalActions}
+        <div class="detail-row"><span>產品</span><b>${esc(r.productType)} × ${esc(r.quantity)}</b></div>
+        <div class="detail-row"><span>電話</span><a href="tel:${esc(r.phone)}">${esc(r.phone || "未提供")}</a></div>
+        <div class="detail-row"><span>LINE ID</span><b>${esc(r.lineId || "未提供")}</b></div>
+        <div class="detail-row"><span>報價金額</span><b>${money(r.quotePrice)}</b></div>
+        <div class="detail-row"><span>狀態</span><b>${STATUS_TEXT[r.status] || "未知"}</b></div>
+        <div class="detail-row"><span>下次追蹤</span><b>${esc(r.followUpDate || "未設定")} (${esc(dueLabel(r))})</b></div>
+        <div class="detail-row"><span>負責人</span><b>${esc(r.owner || "未指派")}</b></div>
+        <div class="detail-row"><span>備註</span><div>${esc(r.notes || "無")}</div></div>
+        <div class="detail-row">
+          <span>聯絡與修改紀錄</span>
+          <div class="history">${(r.history || []).map(h => `<div class="history-item">${esc(h.type)}：${esc(h.text)}<small>${new Date(h.at).toLocaleString("zh-TW")}</small></div>`).join("") || "尚無紀錄"}</div>
+        </div>`;
+      document.getElementById("detailModal").classList.add("show");
+    }
+    function closeDetail() {
+      document.getElementById("detailModal").classList.remove("show");
+      detailId = null;
+    }
+    function getDetail() {
+      return records.find(r => r.inquiryId === detailId);
+    }
+    function markContacted() {
+      const r = getDetail();
+      if (!r) return;
+      r.lastContactDate = todayISO();
+      const next = new Date();
+      next.setDate(next.getDate() + 2);
+      next.setMinutes(next.getMinutes() - next.getTimezoneOffset());
+      r.followUpDate = next.toISOString().slice(0, 10);
+      addHistory(r, "聯絡", "已聯絡客戶，下次追蹤排在 2 天後");
+      saveData(); render(); openDetail(r.inquiryId); toast("已更新聯絡紀錄");
+    }
+    function markSigned() {
+      const r = getDetail();
+      if (!r) return;
+      r.status = "signed";
+      r.followUpDate = "";
+      addHistory(r, "成交", "標記為已簽約");
+      saveData(); closeDetail(); render(); toast("已標記簽約");
+    }
+    function setTomorrow() {
+      const r = getDetail();
+      if (!r) return;
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      r.followUpDate = d.toISOString().slice(0, 10);
+      addHistory(r, "追蹤", "下次追蹤日改為明天");
+      saveData(); render(); openDetail(r.inquiryId); toast("已排入明天追蹤");
+    }
+    function softDelete() {
+      const r = getDetail();
+      if (!r || !confirm("要把這筆資料移到回收嗎？")) return;
+      r.deletedAt = new Date().toISOString();
+      addHistory(r, "刪除", "移到回收區");
+      saveData(); closeDetail(); render(); toast("已移到回收區");
+    }
+    function restoreRecord() {
+      const r = getDetail();
+      if (!r) return;
+      r.deletedAt = "";
+      addHistory(r, "恢復", "從回收區恢復");
+      saveData(); closeDetail(); render(); toast("已恢復");
+    }
+    function permanentDelete() {
+      const r = getDetail();
+      if (!r || !confirm("永久刪除後無法恢復，確定嗎？")) return;
+      records = records.filter(x => x.inquiryId !== r.inquiryId);
+      saveData(); closeDetail(); render(); toast("已永久刪除");
+    }
+    function closeModal(event, id) {
+      if (event.target.id === id) event.target.classList.remove("show");
+    }
+    function openSettings() { document.getElementById("settingsModal").classList.add("show"); }
+    function closeSettings() { document.getElementById("settingsModal").classList.remove("show"); }
+    function download(name, type, content) {
+      const blob = new Blob([content], { type });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    function exportBackup() {
+      download("talos-crm-backup-" + todayISO() + ".json", "application/json", JSON.stringify({ version: 2, records }, null, 2));
+      toast("已建立 JSON 備份");
+    }
+    function exportCsv() {
+      const headers = ["客戶名稱", "電話", "LINE ID", "產品", "數量", "報價", "狀態", "下次追蹤", "負責人", "備註"];
+      const rows = records.filter(r => !r.deletedAt).map(r => [r.customerName, r.phone, r.lineId, r.productType, r.quantity, r.quotePrice, STATUS_TEXT[r.status], r.followUpDate, r.owner, r.notes]);
+      const csv = [headers, ...rows].map(row => row.map(v => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
+      download("talos-crm-" + todayISO() + ".csv", "text/csv;charset=utf-8", "\ufeff" + csv);
+      toast("已匯出 CSV");
+    }
+    function importBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          const imported = Array.isArray(data.records) ? data.records : [];
+          if (!imported.length) throw new Error("empty");
+          if (!confirm("要用備份檔覆蓋目前本機資料嗎？")) return;
+          records = imported.map(r => makeRecord(r));
+          saveData(); render(); closeSettings(); toast("備份已還原");
+        } catch {
+          toast("備份檔格式不正確");
+        } finally {
+          event.target.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+    function clearAllData() {
+      if (!confirm("確定清除全部本機 CRM 資料？建議先匯出備份。")) return;
+      localStorage.removeItem(STORE_KEY);
+      records = [];
+      loadData();
+      render();
+      closeSettings();
+      toast("已清除並重建範例資料");
+    }
+    window.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        ["formModal", "detailModal", "settingsModal"].forEach(id => document.getElementById(id).classList.remove("show"));
+      }
+    });
+    loadData();
+    render();
+  </script>
+</body>
+</html>
