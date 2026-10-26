@@ -87,6 +87,14 @@
     .toast { position: fixed; left: 14px; right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 60; display: none; background: #e5e7eb; color: #111827; border-radius: 8px; padding: 12px; font-weight: 750; text-align: center; }
     .toast.show { display: block; }
     .file-input { display: none; }
+    .sheet h3 { margin: 4px 0 0; font-size: 16px; }
+    .sync-box { display: grid; gap: 10px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .sync-status { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 13px; font-weight: 700; }
+    .sync-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gray); flex: 0 0 auto; }
+    .sync-dot.ok { background: var(--green); }
+    .sync-dot.warn { background: var(--gold); }
+    .sync-dot.bad { background: var(--red); }
+    .sync-dot.idle { background: var(--gray); }
     @media (max-width: 420px) {
       body { padding-left: 10px; padding-right: 10px; }
       .tabs { grid-template-columns: repeat(3, 1fr); }
@@ -154,12 +162,21 @@
         <label>數量<input class="field" id="f_qty" type="number" min="1" value="1"></label>
         <label>報價金額<input class="field" id="f_price" type="number" min="0"></label>
         <label>狀態
-          <select class="select" id="f_status">
+          <select class="select" id="f_status" onchange="toggleStageField()">
             <option value="pending_quote">待報價</option>
             <option value="quoted">已報價</option>
             <option value="negotiating">議價中</option>
             <option value="signed">已簽約</option>
             <option value="dead">已取消</option>
+          </select>
+        </label>
+        <label id="stageLabel">取消階段
+          <select class="select" id="f_stage">
+            <option value="">不指定</option>
+            <option value="詢價">詢價</option>
+            <option value="報價">報價</option>
+            <option value="成交">成交</option>
+            <option value="回購">回購</option>
           </select>
         </label>
         <label>下次追蹤日<input class="field" id="f_follow" type="date"></label>
@@ -190,15 +207,27 @@
         <button class="icon-btn" onclick="closeSettings()">×</button>
       </div>
       <div class="form">
-        <button class="secondary" onclick="document.getElementById('importFile').click()">還原 JSON 備份</button>
-        <button class="danger" onclick="clearAllData()">清除全部本機資料</button>
-        <p class="subtitle">提醒：這是單機版 App。備份檔請定期存到雲端硬碟；多人同步與正式帳號權限需要接雲端資料庫。</p>
+        <button class="secondary" type="button" onclick="document.getElementById('importFile').click()">還原 JSON 備份</button>
+        <button class="danger" type="button" onclick="clearAllData()">清除全部本機資料</button>
+        <div class="sync-box">
+          <h3>雲端同步</h3>
+          <div class="sync-status" id="syncStatusLine" role="status">
+            <span class="sync-dot idle" id="syncDot" aria-hidden="true"></span>
+            <span id="syncStatusText">未設定</span>
+          </div>
+          <label>Worker 網址<input class="field" id="syncUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://你的-worker.workers.dev"></label>
+          <label>PIN<input class="field" id="syncPin" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="只存在這台裝置"></label>
+          <button class="secondary" type="button" onclick="saveSyncSettings()">儲存同步設定</button>
+          <button class="primary" type="button" onclick="uploadAllLocal()">上傳全部本機資料</button>
+          <p class="subtitle">未設定或連不上雲端時，資料仍只留在這台裝置，用法與原本相同。</p>
+        </div>
       </div>
     </section>
   </div>
 
   <div class="toast" id="toast"></div>
 
+  <script src="sync.js"></script>
   <script>
     const STORE_KEY = "talos_crm_v2";
     const STATUS_TEXT = {
@@ -219,10 +248,17 @@
       customerName: "", phone: "", lineId: "", productType: "", quantity: 1,
       quotePrice: 0, status: "pending_quote", followUpDate: "", owner: "", notes: ""
     };
+    const LEGACY_DEMOS = [
+      ["張三酒吧", "@zhang_san_bar"],
+      ["李四便利店", "@li_si_shop"],
+      ["王五啤酒館", "@wang_wu_beer"]
+    ];
     let records = [];
     let currentTab = "all";
     let editingId = null;
     let detailId = null;
+    let syncQueue = Promise.resolve();
+    let uploading = false;
 
     function todayISO() {
       const d = new Date();
@@ -250,24 +286,143 @@
       clearTimeout(window.toastTimer);
       window.toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
     }
-    function loadData() {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (raw) {
-        try { records = JSON.parse(raw).records || []; }
-        catch { records = []; }
+    function isLegacyDemo(record) {
+      if (!record) return false;
+      return LEGACY_DEMOS.some(([name, lineId]) => record.customerName === name && record.lineId === lineId);
+    }
+    function runSync(task) {
+      const run = syncQueue.catch(() => undefined).then(task).catch(() => undefined);
+      syncQueue = run;
+      return run;
+    }
+    function writeLocal() {
+      if (window.TalosSync) {
+        TalosSync.saveLocal(localStorage, records);
+        return;
       }
-      if (!records.length) {
-        const t = todayISO();
-        records = [
-          makeRecord({ customerName: "張三酒吧", phone: "0912-345-678", lineId: "@zhang_san_bar", productType: "Unitank 2.0", quotePrice: 150000, status: "quoted", followUpDate: t, notes: "客戶希望能便宜一點" }),
-          makeRecord({ customerName: "李四便利店", phone: "0912-456-789", lineId: "@li_si_shop", productType: "Grainfather G30", quantity: 2, quotePrice: 320000, status: "pending_quote", followUpDate: t, notes: "大訂單，有議價空間" }),
-          makeRecord({ customerName: "王五啤酒館", phone: "0912-567-890", lineId: "@wang_wu_beer", productType: "iGulu", quotePrice: 85000, status: "signed", notes: "已簽約，2026/06/20 交貨" })
-        ];
-        saveData();
+      localStorage.setItem(STORE_KEY, JSON.stringify({ version: 2, savedAt: new Date().toISOString(), records }));
+    }
+    function loadData() {
+      records = [];
+      if (window.TalosSync) records = TalosSync.readRecords(localStorage);
+      else {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            records = Array.isArray(parsed.records) ? parsed.records : [];
+          } catch { records = []; }
+        }
+      }
+      const kept = records.filter(record => !isLegacyDemo(record));
+      if (kept.length !== records.length) {
+        records = kept;
+        writeLocal();
       }
     }
-    function saveData() {
-      localStorage.setItem(STORE_KEY, JSON.stringify({ version: 2, savedAt: new Date().toISOString(), records }));
+    function saveData(changedRecord) {
+      writeLocal();
+      if (changedRecord) void runSync(() => pushChanged(changedRecord));
+    }
+    async function pushChanged(record) {
+      try {
+        if (!window.TalosSync || !record || !record.inquiryId) return;
+        const settings = TalosSync.readSettings(localStorage);
+        if (!TalosSync.isConfigured(settings)) return;
+        const current = records.find(item => item.inquiryId === record.inquiryId);
+        if (!current || current !== record) return;
+        const sentAt = current.updatedAt;
+        const result = await TalosSync.pushRecord(settings, current, TalosSync.readOutbox(localStorage));
+        TalosSync.writeOutbox(localStorage, result.outbox || []);
+        if (result.ok && result.record && current.updatedAt === sentAt) {
+          const stamped = TalosSync.applyServerTimestamps([current], [result.record])[0];
+          if (stamped && stamped.updatedAt !== current.updatedAt) {
+            current.updatedAt = stamped.updatedAt;
+            writeLocal();
+          }
+        }
+        renderSyncStatus(result.status);
+      } catch {
+        renderSyncStatus("unreachable");
+      }
+    }
+    function forgetOutbox(inquiryId) {
+      if (!window.TalosSync || !inquiryId) return;
+      const current = TalosSync.readOutbox(localStorage);
+      if (!current.some(item => item && item.inquiryId === inquiryId)) return;
+      TalosSync.writeOutbox(localStorage, current.filter(item => item && item.inquiryId !== inquiryId));
+    }
+    function renderSyncStatus(status) {
+      const dot = document.getElementById("syncDot");
+      const text = document.getElementById("syncStatusText");
+      if (!dot || !text) return;
+      const pending = window.TalosSync ? TalosSync.readOutbox(localStorage).length : 0;
+      let kind = "idle";
+      let label = "未設定";
+      if (status === "syncing") {
+        kind = "warn";
+        label = "同步中";
+      } else if (status === "online") {
+        kind = "ok";
+        label = pending ? "已連線，待上傳 " + pending + " 筆" : "已連線";
+      } else if (status === "unauthorized") {
+        kind = "bad";
+        label = "PIN 不正確";
+      } else if (status === "forbidden") {
+        kind = "bad";
+        let origin = "";
+        try { origin = location.origin; } catch { origin = ""; }
+        label = origin ? "來源未被允許（" + origin + "）" : "來源未被允許";
+      } else if (status === "rejected") {
+        kind = "bad";
+        label = "資料被拒絕";
+      } else if (status === "unreachable") {
+        kind = "bad";
+        label = pending ? "無法連線，待上傳 " + pending + " 筆" : "無法連線";
+      }
+      dot.className = "sync-dot " + kind;
+      text.textContent = label;
+    }
+    function fillSyncForm(settings) {
+      const url = document.getElementById("syncUrl");
+      const pin = document.getElementById("syncPin");
+      if (url) url.value = settings && settings.baseUrl || "";
+      if (pin) pin.value = settings && settings.pin || "";
+    }
+    function storeSettingsFromForm() {
+      if (!window.TalosSync) return null;
+      try {
+        return TalosSync.writeSettings(localStorage, {
+          baseUrl: document.getElementById("syncUrl").value,
+          pin: document.getElementById("syncPin").value
+        });
+      } catch {
+        toast("無法儲存同步設定，其他資料仍在");
+        return null;
+      }
+    }
+    async function refreshFromCloud() {
+      if (!window.TalosSync) return;
+      const settings = TalosSync.readSettings(localStorage);
+      if (!TalosSync.isConfigured(settings)) {
+        renderSyncStatus("unconfigured");
+        return;
+      }
+      renderSyncStatus("syncing");
+      try {
+        const result = await TalosSync.syncOnLoad(settings, records, TalosSync.readOutbox(localStorage));
+        TalosSync.writeOutbox(localStorage, result.outbox || []);
+        if (Array.isArray(result.records)) {
+          records = result.records;
+          writeLocal();
+          render();
+          const detailOpen = detailId && document.getElementById("detailModal").classList.contains("show");
+          if (detailOpen && records.some(item => item.inquiryId === detailId)) openDetail(detailId);
+        }
+        renderSyncStatus(result.status || "unreachable");
+      } catch {
+        renderSyncStatus("unreachable");
+      }
     }
     function makeRecord(data) {
       const now = new Date().toISOString();
@@ -285,7 +440,10 @@
     function addHistory(record, type, text) {
       record.history = record.history || [];
       record.history.unshift({ at: new Date().toISOString(), type, text });
-      record.updatedAt = new Date().toISOString();
+      const now = Date.now();
+      const prev = Date.parse(record.updatedAt);
+      const next = Number.isFinite(prev) ? Math.max(now, prev + 1) : now;
+      record.updatedAt = new Date(next).toISOString();
     }
     function isActive(r) {
       return !r.deletedAt && ["pending_quote", "quoted", "negotiating"].includes(r.status);
@@ -382,6 +540,8 @@
       document.getElementById("f_qty").value = r.quantity || 1;
       document.getElementById("f_price").value = r.quotePrice || "";
       document.getElementById("f_status").value = r.status || "pending_quote";
+      document.getElementById("f_stage").value = r.stage || "";
+      toggleStageField();
       document.getElementById("f_follow").value = r.followUpDate || "";
       document.getElementById("f_owner").value = r.owner || "";
       document.getElementById("f_notes").value = r.notes || "";
@@ -390,6 +550,12 @@
     function closeForm() {
       document.getElementById("formModal").classList.remove("show");
       editingId = null;
+    }
+    function toggleStageField() {
+      const label = document.getElementById("stageLabel");
+      const status = document.getElementById("f_status");
+      if (!label || !status) return;
+      label.style.display = status.value === "dead" ? "" : "none";
     }
     function saveForm() {
       const data = {
@@ -408,14 +574,21 @@
         toast("請填入客戶名稱與產品類型");
         return;
       }
+      const stage = document.getElementById("f_stage").value;
+      if (data.status === "dead" && ["詢價", "報價", "成交", "回購"].indexOf(stage) !== -1) data.stage = stage;
+      let saved = null;
       if (editingId) {
         const r = records.find(x => x.inquiryId === editingId);
         Object.assign(r, data);
+        if (data.stage) r.stage = data.stage;
+        else delete r.stage;
         addHistory(r, "編輯", "更新客戶資料");
+        saved = r;
       } else {
-        records.unshift(makeRecord(data));
+        saved = makeRecord(data);
+        records.unshift(saved);
       }
-      saveData();
+      saveData(saved);
       closeForm();
       render();
       toast("已保存");
@@ -446,7 +619,7 @@
         <div class="detail-row"><span>電話</span><a href="tel:${esc(r.phone)}">${esc(r.phone || "未提供")}</a></div>
         <div class="detail-row"><span>LINE ID</span><b>${esc(r.lineId || "未提供")}</b></div>
         <div class="detail-row"><span>報價金額</span><b>${money(r.quotePrice)}</b></div>
-        <div class="detail-row"><span>狀態</span><b>${STATUS_TEXT[r.status] || "未知"}</b></div>
+        <div class="detail-row"><span>狀態</span><b>${STATUS_TEXT[r.status] || "未知"}${r.stage ? " · " + esc(r.stage) : ""}</b></div>
         <div class="detail-row"><span>下次追蹤</span><b>${esc(r.followUpDate || "未設定")} (${esc(dueLabel(r))})</b></div>
         <div class="detail-row"><span>負責人</span><b>${esc(r.owner || "未指派")}</b></div>
         <div class="detail-row"><span>備註</span><div>${esc(r.notes || "無")}</div></div>
@@ -472,7 +645,7 @@
       next.setMinutes(next.getMinutes() - next.getTimezoneOffset());
       r.followUpDate = next.toISOString().slice(0, 10);
       addHistory(r, "聯絡", "已聯絡客戶，下次追蹤排在 2 天後");
-      saveData(); render(); openDetail(r.inquiryId); toast("已更新聯絡紀錄");
+      saveData(r); render(); openDetail(r.inquiryId); toast("已更新聯絡紀錄");
     }
     function markSigned() {
       const r = getDetail();
@@ -480,7 +653,7 @@
       r.status = "signed";
       r.followUpDate = "";
       addHistory(r, "成交", "標記為已簽約");
-      saveData(); closeDetail(); render(); toast("已標記簽約");
+      saveData(r); closeDetail(); render(); toast("已標記簽約");
     }
     function setTomorrow() {
       const r = getDetail();
@@ -490,33 +663,90 @@
       d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
       r.followUpDate = d.toISOString().slice(0, 10);
       addHistory(r, "追蹤", "下次追蹤日改為明天");
-      saveData(); render(); openDetail(r.inquiryId); toast("已排入明天追蹤");
+      saveData(r); render(); openDetail(r.inquiryId); toast("已排入明天追蹤");
     }
     function softDelete() {
       const r = getDetail();
       if (!r || !confirm("要把這筆資料移到回收嗎？")) return;
       r.deletedAt = new Date().toISOString();
       addHistory(r, "刪除", "移到回收區");
-      saveData(); closeDetail(); render(); toast("已移到回收區");
+      saveData(r); closeDetail(); render(); toast("已移到回收區");
     }
     function restoreRecord() {
       const r = getDetail();
       if (!r) return;
       r.deletedAt = "";
       addHistory(r, "恢復", "從回收區恢復");
-      saveData(); closeDetail(); render(); toast("已恢復");
+      saveData(r); closeDetail(); render(); toast("已恢復");
     }
     function permanentDelete() {
       const r = getDetail();
-      if (!r || !confirm("永久刪除後無法恢復，確定嗎？")) return;
-      records = records.filter(x => x.inquiryId !== r.inquiryId);
-      saveData(); closeDetail(); render(); toast("已永久刪除");
+      if (!r || !confirm("永久刪除只會從這台裝置移除。要同步刪除狀態，請改用移到回收。")) return;
+      const inquiryId = r.inquiryId;
+      records = records.filter(x => x.inquiryId !== inquiryId);
+      saveData();
+      forgetOutbox(inquiryId);
+      closeDetail(); render(); toast("已永久刪除");
     }
     function closeModal(event, id) {
       if (event.target.id === id) event.target.classList.remove("show");
     }
-    function openSettings() { document.getElementById("settingsModal").classList.add("show"); }
+    function openSettings() {
+      document.getElementById("settingsModal").classList.add("show");
+      if (!window.TalosSync) return;
+      const settings = TalosSync.readSettings(localStorage);
+      fillSyncForm(settings);
+      void runSync(() => refreshFromCloud());
+    }
     function closeSettings() { document.getElementById("settingsModal").classList.remove("show"); }
+    function saveSyncSettings() {
+      const settings = storeSettingsFromForm();
+      if (!settings) {
+        if (!window.TalosSync) toast("雲端同步尚未載入，本機資料仍在");
+        return;
+      }
+      fillSyncForm(settings);
+      toast("已儲存同步設定");
+      void runSync(() => refreshFromCloud());
+    }
+    function uploadAllLocal() {
+      if (uploading) return;
+      if (!window.TalosSync) {
+        toast("雲端同步尚未載入，本機資料仍在");
+        return;
+      }
+      const settings = storeSettingsFromForm();
+      if (!settings) return;
+      fillSyncForm(settings);
+      if (!TalosSync.isConfigured(settings)) {
+        renderSyncStatus("unconfigured");
+        toast("請先填入 Worker 網址與 PIN");
+        return;
+      }
+      uploading = true;
+      renderSyncStatus("syncing");
+      void runSync(async () => {
+        try {
+          const result = await TalosSync.bulkUpload(settings, records);
+          if (result.ok) {
+            records = TalosSync.applyServerTimestamps(records, result.records);
+            writeLocal();
+            render();
+            TalosSync.writeOutbox(localStorage, []);
+            renderSyncStatus("online");
+            toast("已上傳 " + result.upserted + " 筆");
+          } else {
+            renderSyncStatus(result.status || "unreachable");
+            toast("上傳失敗，本機資料仍在");
+          }
+        } catch {
+          renderSyncStatus("unreachable");
+          toast("上傳失敗，本機資料仍在");
+        } finally {
+          uploading = false;
+        }
+      });
+    }
     function download(name, type, content) {
       const blob = new Blob([content], { type });
       const a = document.createElement("a");
@@ -547,7 +777,12 @@
           if (!imported.length) throw new Error("empty");
           if (!confirm("要用備份檔覆蓋目前本機資料嗎？")) return;
           records = imported.map(r => makeRecord(r));
-          saveData(); render(); closeSettings(); toast("備份已還原");
+          saveData();
+          render();
+          closeSettings();
+          toast("備份已還原");
+          const importedRecords = records.slice();
+          void runSync(() => pushImported(importedRecords));
         } catch {
           toast("備份檔格式不正確");
         } finally {
@@ -556,14 +791,40 @@
       };
       reader.readAsText(file);
     }
+    async function pushImported(list) {
+      try {
+        if (!window.TalosSync) return;
+        const settings = TalosSync.readSettings(localStorage);
+        if (!TalosSync.isConfigured(settings)) return;
+        const result = await TalosSync.bulkUpload(settings, list);
+        if (result.ok) {
+          records = TalosSync.applyServerTimestamps(records, result.records);
+          writeLocal();
+          render();
+          TalosSync.writeOutbox(localStorage, []);
+          renderSyncStatus("online");
+          return;
+        }
+        let queue = [];
+        for (const record of list) queue = TalosSync.enqueueOutbox(queue, record);
+        TalosSync.writeOutbox(localStorage, queue);
+        renderSyncStatus(result.status || "unreachable");
+      } catch {
+        renderSyncStatus("unreachable");
+      }
+    }
     function clearAllData() {
-      if (!confirm("確定清除全部本機 CRM 資料？建議先匯出備份。")) return;
-      localStorage.removeItem(STORE_KEY);
+      if (!confirm("確定清除全部本機 CRM 資料？建議先匯出備份。雲端上已有的資料，重新整理後會再合併回來。")) return;
       records = [];
-      loadData();
+      try { localStorage.removeItem(STORE_KEY); } catch { /* keep going; the in-memory list is already empty */ }
+      if (window.TalosSync) {
+        try { TalosSync.writeOutbox(localStorage, []); } catch { /* the local list is already cleared */ }
+      } else {
+        try { localStorage.removeItem("talos_crm_outbox"); } catch { /* same as above */ }
+      }
       render();
       closeSettings();
-      toast("已清除並重建範例資料");
+      toast("已清除本機資料");
     }
     window.addEventListener("keydown", e => {
       if (e.key === "Escape") {
@@ -572,6 +833,8 @@
     });
     loadData();
     render();
+    void runSync(() => refreshFromCloud());
+    window.addEventListener("online", () => { void runSync(() => refreshFromCloud()); });
   </script>
 </body>
 </html>

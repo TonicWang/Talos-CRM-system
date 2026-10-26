@@ -1,0 +1,7 @@
+{
+  "name": "talos-crm",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}
