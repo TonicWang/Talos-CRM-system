@@ -1,0 +1,16 @@
+# 不要上傳到 Cloudflare 的檔案（只公開網頁本身需要的檔案）
+.git
+.github
+.gitignore
+.wrangler
+.dev.vars*
+node_modules
+package.json
+package-lock.json
+wrangler.jsonc
+*.md
+sync.test.js
+*.test.js
+*.test.mjs
+test
+.assetsignore

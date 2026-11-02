@@ -1,0 +1,19 @@
+{
+  // Talos CRM（純靜態網頁），由 Cloudflare Workers Static Assets 直接提供，不需要 build。
+  "name": "talos-crm",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "."
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
+}
